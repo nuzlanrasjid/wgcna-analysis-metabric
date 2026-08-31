@@ -1,16 +1,8 @@
-# ============================================================
 # WGCNA on Breast Cancer Transcriptomic Data (METABRIC)
-# ============================================================
 # Weighted Gene Co-expression Network Analysis, applied to the
-# METABRIC breast cancer dataset (Kaggle) as a training exercise
-# ahead of applying the same pipeline to plant RNA-seq data.
-#
+# METABRIC breast cancer dataset (Kaggle) 
 # Dataset: https://www.kaggle.com/datasets/raghadalharbi/breast-cancer-gene-expression-profiles-metabric
-# ============================================================
-
-# ------------------------------------------------------------
-# 1. Install & load packages
-# ------------------------------------------------------------
+## 1. Install & load packages
 if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install("WGCNA", update = FALSE, ask = FALSE)
 install.packages("fastDummies")
@@ -19,20 +11,13 @@ library(WGCNA)
 library(dplyr)
 library(fastDummies)
 
-options(stringsAsFactors = FALSE)
-enableWGCNAThreads()
-
-# ------------------------------------------------------------
-# 2. Load dataset
-# ------------------------------------------------------------
+## 2. Load dataset
 df <- read.csv("data/METABRIC_RNA_Mutation.csv")
 
 dim(df)
 colSums(is.na(df))
 
-# ------------------------------------------------------------
-# 3. Split columns: clinical vs. mutation vs. gene expression
-# ------------------------------------------------------------
+## 3. Split columns: clinical vs. mutation vs. gene expression
 # mutation columns are suffixed "_mut"
 cols_mutation <- names(df)[grepl("_mut$", names(df), ignore.case = TRUE)]
 
@@ -60,9 +45,7 @@ cat("Clinical columns:", length(cols_clinical), "\n")
 cat("Mutation columns:", length(cols_mutation), "(unused)\n")
 cat("Gene columns    :", length(cols_gene), "\n")
 
-# ------------------------------------------------------------
-# 4. Build expression (samples x genes) and trait (samples x clinical) matrices
-# ------------------------------------------------------------
+## 4. Build expression (samples x genes) and trait (samples x clinical) matrices
 id_sample <- if ("patient_id" %in% names(df)) "patient_id" else names(df)[1]
 
 df_expr <- df[, cols_gene]
@@ -75,9 +58,7 @@ df_clinical <- df_clinical[rownames(df_expr), , drop = FALSE]  # keep sample ord
 dim(df_expr)
 dim(df_clinical)
 
-# ------------------------------------------------------------
-# 5. Data quality check (required before network construction)
-# ------------------------------------------------------------
+## 5. Data quality check (required before network construction)
 gsg <- goodSamplesGenes(df_expr, verbose = 3)
 gsg$allOK
 
@@ -88,9 +69,7 @@ if (!gsg$allOK) {
   print(dim(df_expr))
 }
 
-# ------------------------------------------------------------
-# 6. Soft-thresholding power selection
-# ------------------------------------------------------------
+## 6. Soft-thresholding power selection
 power_range <- 1:20
 sft <- pickSoftThreshold(df_expr, powerVector = power_range, verbose = 5)
 
@@ -107,9 +86,7 @@ plot(sft$fitIndices[, 1], sft$fitIndices[, 5],
 soft_power <- sft$powerEstimate
 cat("Selected soft-thresholding power:", soft_power, "\n")
 
-# ------------------------------------------------------------
 # 7. Network construction & module detection
-# ------------------------------------------------------------
 net <- blockwiseModules(
   df_expr,
   power = soft_power,
@@ -137,18 +114,14 @@ plotDendroAndColors(net$dendrograms[[1]], moduleColors[net$blockGenes[[1]]],
                      addGuide = TRUE, guideHang = 0.08)
 dev.off()
 
-# ------------------------------------------------------------
-# 8. Module membership
-# ------------------------------------------------------------
+## 8. Module membership
 gene_module_df <- data.frame(gene = colnames(df_expr), module = moduleColors)
 table(gene_module_df$module)
 
 # per-module gene lists
 split(gene_module_df$gene, gene_module_df$module)
 
-# ------------------------------------------------------------
-# 9. Module-trait relationships
-# ------------------------------------------------------------
+## 9. Module-trait relationships
 # cancer_type is excluded: 1903/1904 samples fall in a single category
 table(df_clinical$cancer_type)
 table(df_clinical$pam50_._claudin.low_subtype)
@@ -198,9 +171,7 @@ labeledHeatmap(
 )
 dev.off()
 
-# ------------------------------------------------------------
-# 10. Export results
-# ------------------------------------------------------------
+## 10. Export results
 write.csv(gene_module_df, "output/tables/metabric_gene_modules.csv", row.names = FALSE)
 
 for (mod in unique(gene_module_df$module)) {
@@ -223,5 +194,3 @@ write.csv(moduleTraitPvalue_df, "output/tables/module_trait_pvalue.csv", row.nam
 save(net, moduleColors, MEs, df_expr, df_clinical,
      moduleTraitCor, moduleTraitPvalue,
      file = "output/metabric_WGCNA_result.RData")
-
-cat("Done. Results written to output/figures/ and output/tables/\n")
